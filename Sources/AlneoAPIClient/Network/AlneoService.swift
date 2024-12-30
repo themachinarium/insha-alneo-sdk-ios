@@ -6,14 +6,61 @@
 //
 
 import Foundation
-//import CryptoKit
+import CryptoKit
+import SwiftyJSON
+import UIKit
+
+// MARK: - API Error Handling
+public enum APIError: Error {
+    case invalidResponse(String)
+    case networkError(String)
+    case parseError(String)
+    case serverError(message: String)
+}
+
+public struct Build {
+
+    static let API_URL: String = "https://alneomac.2sworks.com"
+    
+    static let DEFAULT_BIN = "52586400"
+    
+}
+
+// MARK: - API Endpoints
+public enum Endpoint: String {
+    case PAYMENT_BY_SESSION = "/service/payment/by/session"
+    case PAYMENT_WITHOUT_REGISTERED_CARD = "/service/payment/v2/non-registered"
+    
+    case POS_COMMISSION = "/service/pos/v2/commission"
+    
+    case SESSION_DETAIL = "/service/payment/session"
+    case SESSION_CREATE = "/service/payment/session/create"
+    case SESSION_HANDSHAKE = "/service/payment/session/handshake"
+    case SESSION_FINALIZE = "/service/payment/session/finalize"
+    case SESSION_CHECK = "/service/payment/session/check"
+    case SESSION_REJECT = "/service/payment/session/reject"
+    
+    case USER_DETAIL = "/service/user/company/representative"
+    
+    case VERSION_CHECK = "/service/system/version/check"
+}
 
 public class AlneoService {
-        
-    public init() {} // Preventing initialization from outside
     
-    // Base URL for the API
-    private let baseURL = "https://babel-proxy.cognesive.com" // Replace with the actual base URL
+    private var apiKey: String?
+    private var apiSecret: String?
+    private var userCode: String?
+    
+    public init() {}
+    
+    // MARK: - Set API Keys
+    public func setKeys(apiKey: String, apiSecret: String, userCode: String) {
+        self.apiKey = apiKey
+        self.apiSecret = apiSecret
+        self.userCode = userCode
+    }
+    
+    private let baseURL = Build.API_URL
     
     // MARK: - Request Method Enum
     enum RequestMethod: String {
@@ -22,167 +69,93 @@ public class AlneoService {
     }
     
     // MARK: - Network Request Helper
-    private func performRequest<T: Decodable, U: Encodable>(
+    func performRequest(
         endpoint: Endpoint,
         method: RequestMethod,
-        parameters: U?,
-        completion: @escaping (Result<T, APIError>) -> Void
+        parameters: Encodable? = nil,
+        body: Encodable? = nil,
+        completion: @escaping @Sendable (Result<JSON, APIError>) -> Void
     ) {
-        guard let url = URL(string: baseURL + endpoint.rawValue) else {
-            completion(.failure(.invalidResponse("Invalid URL.")))
+        // Check if the API keys are set
+        guard let apiKey = self.apiKey, !apiKey.isEmpty,
+              let apiSecret = self.apiSecret, !apiSecret.isEmpty,
+              let userCode = self.userCode, !userCode.isEmpty else {
+            completion(.failure(.invalidResponse("API anahtarları veya kullanıcı kodu ayarlanmamış. Lütfen `setKeys` metodunu çağırın.")))
             return
         }
         
-        let applicationVersion: String? = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String;
-        let applicationBundleVersion : String? = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        guard let url = URL(string: baseURL + endpoint.rawValue) else {
+            completion(.failure(.invalidResponse("Geçersiz URL.")))
+            return
+        }
+        
+        guard var urlComponents = URLComponents(string: baseURL + endpoint.rawValue) else {
+            completion(.failure(.invalidResponse("Parametrelerle geçersiz URL oluşturuldu.")))
+            return
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-//        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.allHTTPHeaderFields = {
-            headers = [
-                "Accept": "application/json",
-                "User-Agent": "com.albaraka.alneo.cuzdan",
-                "Version": applicationVersion != nil ? applicationVersion! : "0.100",
-                "Version-Code": applicationBundleVersion != nil ? applicationBundleVersion! : "1",
-                "Status": String(Build.DEBUG),
-                "Application": "WALLET",
-                "Client": "iOS",
-                "Client-SDK": UIDevice.current.systemVersion,
-                "Client-Device": UIDevice.current.model,
-                "Client-Product": UIDevice.current.name,
-                "Client-Version": UIDevice.current.systemVersion
-            ]
-        }
+        request.allHTTPHeaderFields = [
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "x-api-secret": apiSecret,
+            "x-user-code": userCode
+        ]
         
         if let parameters = parameters {
+            var queryItems = [URLQueryItem]()
+            let mirror = Mirror(reflecting: parameters)
+            for child in mirror.children {
+                if let key = child.label {
+                    queryItems.append(URLQueryItem(name: key, value: "\(child.value)"))
+                }
+            }
+            urlComponents.queryItems = queryItems
+        }
+        
+        if let body = body {
             do {
-                let jsonData = try JSONEncoder().encode(parameters)
+                let jsonData = try JSONEncoder().encode(body)
                 request.httpBody = jsonData
             } catch {
-                completion(.failure(.invalidResponse("Failed to encode parameters.")))
+                completion(.failure(.invalidResponse("İstek gövdesi kodlanamadı.")))
                 return
             }
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            // Network error handling
             if let error = error {
-                completion(.failure(.networkError(error.localizedDescription)))
+                completion(.failure(.networkError("Ağ hatası: \(error.localizedDescription)")))
                 return
             }
             
             guard let data = data else {
-                completion(.failure(.invalidResponse("No data received.")))
+                completion(.failure(.invalidResponse("Sunucudan veri alınamadı.")))
                 return
             }
             
-            // HTTP Status Code check
             guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(.invalidResponse("Invalid response.")))
+                completion(.failure(.invalidResponse("Geçersiz sunucu yanıtı.")))
                 return
             }
             
             switch httpResponse.statusCode {
             case 200...299:
-                // Success - Try decoding response
                 do {
-                    let result = try JSONDecoder().decode(T.self, from: data)
+                    let result = try JSON(data: data)
                     completion(.success(result))
                 } catch {
-                    completion(.failure(.parseError("Failed to decode response.")))
+                    completion(.failure(.parseError("Sunucu yanıtı işlenirken bir hata oluştu.")))
                 }
             default:
-                // API-specific error handling (non-2xx response)
                 do {
-                    // Attempt to parse the error message from the response body
-                    let errorResponse = try JSONDecoder().decode(APIErrorResponse.self, from: data)
-                    completion(.failure(.serverError(message: errorResponse.message)))
+                    let errorResponse = try JSON(data: data)
+                    completion(.failure(.serverError(message: errorResponse["message"].string ?? "Bilinmeyen bir hata oluştu.")))
                 } catch {
-                    completion(.failure(.serverError(message: "Unknown API error.")))
+                    completion(.failure(.serverError(message: "Bilinmeyen bir sunucu hatası.")))
                 }
             }
         }.resume()
-    }
-
-    // MARK: - API Error Handling
-    enum APIError: Error {
-        case invalidResponse(String)
-        case networkError(String)
-        case parseError(String)
-        case serverError(message: String)
-    }
-    
-    // MARK: - API Endpoints
-    enum Endpoint: String {
-        case login = "/service/auth/login"
-        case cardOfUser = "/card/user"
-        case sessionHandshake = "/session/handshake"
-        case paymentWithRegistered = "/payment/registered"
-        case sessionFinalize = "/session/finalize"
-        case sessionDetail = "/session/detail"
-        case installmentByBin = "/installment/bin"
-        case sessionCheck = "/session/check"
-        case paymentBySession = "/payment/session"
-    }
-    
-    // MARK: - API Methods
-    
-    public func login(phone_number: String, password: String, user_type: String, completion: @escaping (Result<LoginResponse, APIError>) -> Void) {
-        let parameters = LoginRequest(phone_number: username, password: password, user_type: )
-        performRequest(endpoint: .login, method: .POST, parameters: parameters, completion: completion)
-    }
-    
-    func getCardList(page: Int, completion: @escaping (Result<[Card], APIError>) -> Void) {
-        let parameters = CardListRequest(page: page)
-        performRequest(endpoint: .cardOfUser, method: .GET, parameters: parameters, completion: completion)
-    }
-    
-    // Card List Retrieval API
-    func getCardList(page: Int, completion: @escaping (Result<[Card], APIError>) -> Void) {
-        let parameters = CardListRequest(page: page)
-        performRequest(endpoint: .cardOfUser, method: .GET, parameters: parameters, completion: completion)
-    }
-    
-    // QR Payment Session Handshake API
-    func sessionHandshake(paymentType: String, paymentChannel: String, sessionToken: String, cardID: String, oneWay: Bool, completion: @escaping (Result<SessionHandshakeResponse, APIError>) -> Void) {
-        let parameters = SessionHandshakeRequest(paymentType: paymentType, paymentChannel: paymentChannel, sessionToken: sessionToken, cardID: cardID, oneWay: oneWay)
-        performRequest(endpoint: .sessionHandshake, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Immediate Payment API
-    func immediatePayment(sessionToken: String, completion: @escaping (Result<ImmediatePaymentResponse, APIError>) -> Void) {
-        let parameters = ImmediatePaymentRequest(sessionToken: sessionToken)
-        performRequest(endpoint: .paymentWithRegistered, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Session Finalize API
-    func sessionFinalize(sessionToken: String, paymentType: String, completion: @escaping (Result<Void, APIError>) -> Void) {
-        let parameters = SessionFinalizeRequest(sessionToken: sessionToken, paymentType: paymentType)
-        performRequest(endpoint: .sessionFinalize, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Session Detail API
-    func sessionDetail(sessionToken: String, paymentType: String, completion: @escaping (Result<SessionDetailResponse, APIError>) -> Void) {
-        let parameters = SessionDetailRequest(sessionToken: sessionToken, paymentType: paymentType)
-        performRequest(endpoint: .sessionDetail, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Installment By BIN API
-    func installmentByBin(binNumber: String, companyId: String, completion: @escaping (Result<InstallmentOptions, APIError>) -> Void) {
-        let parameters = InstallmentByBinRequest(binNumber: binNumber, companyId: companyId)
-        performRequest(endpoint: .installmentByBin, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Session Check API
-    func sessionCheck(sessionToken: String, paymentType: String, completion: @escaping (Result<SessionStatusResponse, APIError>) -> Void) {
-        let parameters = SessionCheckRequest(sessionToken: sessionToken, paymentType: paymentType)
-        performRequest(endpoint: .sessionCheck, method: .POST, parameters: parameters, completion: completion)
-    }
-
-    // Payment By Session API
-    func paymentBySession(sessionToken: String, completion: @escaping (Result<PaymentSessionResponse, APIError>) -> Void) {
-        let parameters = PaymentBySessionRequest(sessionToken: sessionToken)
-        performRequest(endpoint: .paymentBySession, method: .POST, parameters: parameters, completion: completion)
     }
 }

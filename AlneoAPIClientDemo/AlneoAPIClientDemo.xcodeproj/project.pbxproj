@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		21BCAF862CE236AE00CAF18F /* AlneoAPIClient in Frameworks */ = {isa = PBXBuildFile; productRef = 21BCAF852CE236AE00CAF18F /* AlneoAPIClient */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		21BCAF6C2CE2367500CAF18F /* AlneoAPIClientDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AlneoAPIClientDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				21BCAF862CE236AE00CAF18F /* AlneoAPIClient in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = AlneoAPIClientDemo;
 			packageProductDependencies = (
+				21BCAF852CE236AE00CAF18F /* AlneoAPIClient */,
 			);
 			productName = AlneoAPIClientDemo;
 			productReference = 21BCAF6C2CE2367500CAF18F /* AlneoAPIClientDemo.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = 21BCAF632CE2367500CAF18F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				21BCAF842CE236AE00CAF18F /* XCLocalSwiftPackageReference "../../AlneoAPIClient" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 21BCAF6D2CE2367500CAF18F /* Products */;
 			projectDirPath = "";
@@ -335,6 +344,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		21BCAF842CE236AE00CAF18F /* XCLocalSwiftPackageReference "../../AlneoAPIClient" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../AlneoAPIClient;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		21BCAF852CE236AE00CAF18F /* AlneoAPIClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AlneoAPIClient;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 21BCAF642CE2367500CAF18F /* Project object */;
 }
