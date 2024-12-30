@@ -6,56 +6,18 @@ import Foundation
 import CryptoSwift
 import SwiftyJSON
 
-@MainActor
 public class AlneoAPIClient: NSObject {
     
     private var service: AlneoService
     
     public override init() {
         service = AlneoService()
-        
-        service.deviceSystemVersion = AppDevice.systemVersion()
-        service.deviceModel = AppDevice.model()
-        service.deviceName = AppDevice.name()
-
     }
     
     // MARK: - API Methods
     
-    // MARK: - LOGIN
-    
-    public func login(phone_number: String, password: String, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-        let phone = phone_number.sha256()
-        let pass = password.sha256()
-        
-        let parameters = LoginRequest(phone_number: phone, password: pass, user_type: "COMPANY")
-        service.performRequest(endpoint: .AUTH_LOGIN_VERIFY, method: .POST, body: parameters, completion: completion)
-    }
-    
-    public func loginVerify(token: String, token2: String, pin_code: String, remember_me: Bool, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-        let parameters = LoginVerifyRequest(token: token, token2: token2, pin_code: pin_code, user_type: "COMPANY", remember_me: remember_me)
-        service.performRequest(endpoint: .AUTH_LOGIN_VERIFY, method: .POST, body: parameters, completion: completion)
-    }
-    
-    // MARK: - AUTH RECOVERY
-    
-    public func authRecovery(phone_number: String, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-        let phone = phone_number.sha256()
-        
-        let body = AuthRecoveryRequest(phone_number: phone, user_type: "COMPANY")
-        service.performRequest(endpoint: .AUTH_RECOVERY, method: .POST, body: body, completion: completion)
-    }
-    
-    public func authRecoveryVerify(token: String, token2: String, pin_code: String, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-        let body = AuthRecoveryVerifyRequest(token: token, token2: token2, pin_code: pin_code, user_type: "COMPANY")
-        service.performRequest(endpoint: .AUTH_RECOVERY_VERIFY, method: .POST, body: body, completion: completion)
-    }
-    
-    public func authRecoveryUpdate(token: String, token2: String, password: String, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-        let pass = password.sha256()
-        
-        let body = AuthRecoveryUpdateRequest(token: token, token2: token2, password: pass, user_type: "COMPANY")
-        service.performRequest(endpoint: .AUTH_RECOVERY_UPDATE, method: .POST, body: body, completion: completion)
+    public func setKeys(apiKey: String, apiSecret: String, userCode: String) {
+        self.service.setKeys(apiKey: apiKey, apiSecret: apiSecret, userCode: userCode)
     }
     
     // MARK: - PAYMENT
@@ -137,13 +99,4 @@ public class AlneoAPIClient: NSObject {
     public func userDetail(completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
         service.performRequest(endpoint: .USER_DETAIL, method: .POST, completion: completion)
     }
-    
-//    // MARK: - VERSION_CHECK
-//    
-//    public func versionCheck(token: String, token2: String, password: String, completion: @Sendable @escaping (Result<JSON, APIError>) -> Void) {
-//        let pass = password.sha256()
-//        
-//        let body = AuthRecoveryUpdateRequest(token: token, token2: token2, password: pass, user_type: "COMPANY")
-//        service.performRequest(endpoint: .AUTH_RECOVERY_UPDATE, method: .POST, body: body, completion: completion)
-//    }
 }

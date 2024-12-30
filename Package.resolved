@@ -1,5 +1,5 @@
 {
-  "originHash" : "f9b982ec519a55e1bc079c9768675fe22691ae08c5d9d6b26d68a8899be65bde",
+  "originHash" : "5a5e02c8935a04a30d84243e0fab72292439c82757ed714029fdeb3f889cfdf2",
   "pins" : [
     {
       "identity" : "cryptoswift",
@@ -17,15 +17,6 @@
       "state" : {
         "revision" : "2b6054efa051565954e1d2b9da831680026cd768",
         "version" : "4.3.0"
-      }
-    },
-    {
-      "identity" : "trustkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/datatheorem/TrustKit.git",
-      "state" : {
-        "revision" : "d009bab582513e029924f394c2a3b974f10a44a6",
-        "version" : "3.0.5"
       }
     }
   ],

@@ -9,7 +9,6 @@ import Foundation
 import CryptoKit
 import SwiftyJSON
 import UIKit
-import TrustKit
 
 // MARK: - API Error Handling
 public enum APIError: Error {
@@ -27,17 +26,8 @@ public struct Build {
     
 }
 
-// MARK: - API Endpointsj tbg
+// MARK: - API Endpoints
 public enum Endpoint: String {
-    case AUTH_LOGIN = "/service/auth/login"
-    case AUTH_LOGIN_VERIFY = "/service/auth/login/verify"
-    
-    case AUTH_LOGOUT = "/service/auth/logout"
-    
-    case AUTH_RECOVERY = "/service/auth/recovery"
-    case AUTH_RECOVERY_VERIFY = "/service/auth/recovery/verify"
-    case AUTH_RECOVERY_UPDATE = "/service/auth/recovery/update"
-    
     case PAYMENT_BY_SESSION = "/service/payment/by/session"
     case PAYMENT_WITHOUT_REGISTERED_CARD = "/service/payment/v2/non-registered"
     
@@ -57,32 +47,20 @@ public enum Endpoint: String {
 
 public class AlneoService {
     
-    public var deviceSystemVersion: String = ""
-    public var deviceModel: String = ""
-    public var deviceName: String = ""
+    private var apiKey: String?
+    private var apiSecret: String?
+    private var userCode: String?
     
-    public init() {
-        self.configureTrustKit()
+    public init() {}
+    
+    // MARK: - Set API Keys
+    public func setKeys(apiKey: String, apiSecret: String, userCode: String) {
+        self.apiKey = apiKey
+        self.apiSecret = apiSecret
+        self.userCode = userCode
     }
     
-    private func configureTrustKit() {
-//       let trustKitConfig: [String: Any] = [
-//           kTSKPinnedDomains: [
-//               "10.195.80.22:8080": [
-//                   kTSKPublicKeyHashes: [
-//                       "F8XLjwmcK21/e3/kaACC5UcDhJwGUzaZef0M5GjLdms="
-//                   ],
-//                   kTSKEnforcePinning: true,
-//                   kTSKIncludeSubdomains: true
-//               ]
-//           ]
-//       ]
-//
-//       TrustKit.initSharedInstance(withConfiguration: trustKitConfig)
-   }
-    
-    // Base URL for the API
-    private let baseURL = Build.API_URL  // Replace with the actual base URL
+    private let baseURL = Build.API_URL
     
     // MARK: - Request Method Enum
     enum RequestMethod: String {
@@ -98,101 +76,84 @@ public class AlneoService {
         body: Encodable? = nil,
         completion: @escaping @Sendable (Result<JSON, APIError>) -> Void
     ) {
+        // Check if the API keys are set
+        guard let apiKey = self.apiKey, !apiKey.isEmpty,
+              let apiSecret = self.apiSecret, !apiSecret.isEmpty,
+              let userCode = self.userCode, !userCode.isEmpty else {
+            completion(.failure(.invalidResponse("API anahtarları veya kullanıcı kodu ayarlanmamış. Lütfen `setKeys` metodunu çağırın.")))
+            return
+        }
+        
         guard let url = URL(string: baseURL + endpoint.rawValue) else {
-            completion(.failure(.invalidResponse("Invalid URL.")))
+            completion(.failure(.invalidResponse("Geçersiz URL.")))
             return
         }
         
         guard var urlComponents = URLComponents(string: baseURL + endpoint.rawValue) else {
-                completion(.failure(.invalidResponse("Invalid URL.")))
-                return
-            }
-        
-        let applicationVersion: String? = "1.0.0"// Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        let applicationBundleVersion : String? = "81"// Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+            completion(.failure(.invalidResponse("Parametrelerle geçersiz URL oluşturuldu.")))
+            return
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.allHTTPHeaderFields = [
             "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "com.albaraka.alneo.pos",
-            "Version": applicationVersion != nil ? applicationVersion! : "0.100",
-            "Version-Code": applicationBundleVersion != nil ? applicationBundleVersion! : "1",
-            "Status": String(true),
-            "Application": "WALLET",
-            "Client": "iOS",
-            "Client-SDK": deviceSystemVersion,
-            "Client-Device": deviceModel,
-            "Client-Product": deviceName,
-            "Client-Version": deviceSystemVersion
+            "x-api-key": apiKey,
+            "x-api-secret": apiSecret,
+            "x-user-code": userCode
         ]
         
-        // Step 2: If GET request, append query parameters to the URL
         if let parameters = parameters {
             var queryItems = [URLQueryItem]()
-
-            // Reflect parameters to query items
             let mirror = Mirror(reflecting: parameters)
             for child in mirror.children {
                 if let key = child.label {
-                    let value = "\(child.value)"
-                    queryItems.append(URLQueryItem(name: key, value: value))
+                    queryItems.append(URLQueryItem(name: key, value: "\(child.value)"))
                 }
             }
             urlComponents.queryItems = queryItems
         }
         
-        guard let url = urlComponents.url else {
-               completion(.failure(.invalidResponse("Invalid URL with parameters.")))
-               return
-           }
-
         if let body = body {
             do {
-                let encoder = JSONEncoder()
-                let jsonData = try encoder.encode(body)
+                let jsonData = try JSONEncoder().encode(body)
                 request.httpBody = jsonData
-                print("zzzz 3 ", String(data: jsonData, encoding: .utf8))
             } catch {
-                completion(.failure(.invalidResponse("Failed to encode parameters.")))
+                completion(.failure(.invalidResponse("İstek gövdesi kodlanamadı.")))
                 return
             }
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                completion(.failure(.networkError(error.localizedDescription)))
+                completion(.failure(.networkError("Ağ hatası: \(error.localizedDescription)")))
                 return
             }
             
             guard let data = data else {
-                completion(.failure(.invalidResponse("No data received.")))
+                completion(.failure(.invalidResponse("Sunucudan veri alınamadı.")))
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(.invalidResponse("Invalid response.")))
+                completion(.failure(.invalidResponse("Geçersiz sunucu yanıtı.")))
                 return
             }
             
             switch httpResponse.statusCode {
             case 200...299:
                 do {
-                    //                    let result = try JSONDecoder().decode(T.self, from: data)
                     let result = try JSON(data: data)
-                    print("error: ", result)
                     completion(.success(result))
                 } catch {
-                    completion(.failure(.parseError("Failed to decode response.")))
+                    completion(.failure(.parseError("Sunucu yanıtı işlenirken bir hata oluştu.")))
                 }
             default:
                 do {
-                    let errorResponse = try JSON(data: data)//try JSONDecoder().decode(APIErrorResponse.self, from: data)
-                    print("error: ", errorResponse)
-//                    completion(.failure(.serverError(message: errorResponse.message ?? "Unexpected error")))
+                    let errorResponse = try JSON(data: data)
+                    completion(.failure(.serverError(message: errorResponse["message"].string ?? "Bilinmeyen bir hata oluştu.")))
                 } catch {
-                    completion(.failure(.serverError(message: "Unknown API error.")))
+                    completion(.failure(.serverError(message: "Bilinmeyen bir sunucu hatası.")))
                 }
             }
         }.resume()

@@ -16,16 +16,14 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift.git", .upToNextMajor(from: "1.8.3")),
-        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", from: "4.0.0"),
-        .package(url: "https://github.com/datatheorem/TrustKit.git", .upToNextMajor(from: "3.0.5"))
+        .package(url: "https://github.com/SwiftyJSON/SwiftyJSON.git", from: "4.0.0")
     ],
     targets: [
         .target(
             name: "AlneoAPIClient",
             dependencies: [
                 "CryptoSwift",
-                "SwiftyJSON",
-                "TrustKit"
+                "SwiftyJSON"
             ],
             path: "Sources/AlneoAPIClient", // Specify the path to the AlneoAPIClient folder
             exclude: [] // Include any files you wish to exclude, if any
