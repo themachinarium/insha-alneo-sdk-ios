@@ -55,7 +55,7 @@ client.setKeys(
 
 Replace `YOUR_API_KEY`, `YOUR_API_SECRET`, and `YOUR_USER_CODE` with your credentials provided by InshaAlneo.
 
-### Step 4: Use the SDK
+### Step 4: Use the SDK (Example)
 
 Now, you can use the `sessionCreateDirect` method to initiate a session:
 
